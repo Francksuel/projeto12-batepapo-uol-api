@@ -11,6 +11,12 @@ const participantSchema = joi.object({
 	name: joi.string().min(1).required(),
 });
 
+const messageSchema = joi.object({
+	to: joi.string().min(1).required(),
+	text: joi.string().min(1).required(),
+	type: joi.string().valid("message", "private_message").required(),
+});
+
 const mongoClient = new MongoClient(process.env.MONGO_URI);
 let db;
 mongoClient.connect().then(() => {
@@ -34,9 +40,7 @@ async function repeatName(name) {
 
 app.post("/participants", async (req, res) => {
 	const registry = req.body;
-	const validationParticipant = participantSchema.validate(registry, {
-		abortEarly: false,
-	});
+	const validationParticipant = participantSchema.validate(registry);
 	if (validationParticipant.error) {
 		res.sendStatus(422);
 		return;
@@ -58,15 +62,13 @@ app.post("/participants", async (req, res) => {
 			.collection("participants")
 			.insertOne({ name: registry.name, lastStatus: Date.now() });
 
-		await db
-			.collection("messages")
-			.insertOne({
-				from: registry.name,
-				to: "Todos",
-				text: "entra na sala...",
-				type: "status",
-				time: dayjs().locale('pt-br').format('HH:mm:ss')
-			});
+		await db.collection("messages").insertOne({
+			from: registry.name,
+			to: "Todos",
+			text: "entra na sala...",
+			type: "status",
+			time: dayjs().locale("pt-br").format("HH:mm:ss"),
+		});
 		res.sendStatus(201);
 	} catch {
 		res.status(500);
@@ -77,6 +79,36 @@ app.get("/participants", async (req, res) => {
 	try {
 		const participants = await db.collection("participants").find().toArray();
 		res.send(participants);
+	} catch {
+		res.sendStatus(500);
+	}
+});
+
+app.post("/messages", async (req, res) => {
+	const message = req.body;
+	const validationMessage = messageSchema.validate(message);
+	if (validationMessage.error) {
+		res.sendStatus(422);
+		return;
+	}
+	const user = req.headers.user;
+	const userLogged = await db
+		.collection("participants")
+		.findOne({ name: user });
+	if (!userLogged) {
+		res.sendStatus(422);
+		return;
+	}
+
+	try {
+		await db.collection("messages").insertOne({
+			from: user,
+			to: message.to,
+			text: message.text,
+			type: message.type,
+			time: dayjs().locale("pt-br").format("HH:mm:ss"),
+		});
+		res.sendStatus(201);
 	} catch {
 		res.sendStatus(500);
 	}
