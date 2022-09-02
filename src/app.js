@@ -1,46 +1,72 @@
-import express from 'express';
-import cors from 'cors';
-import { MongoClient } from 'mongodb';
-import dotenv from 'dotenv';
-import Joi from 'joi';
+import express from "express";
+import cors from "cors";
+import { MongoClient } from "mongodb";
+import dotenv from "dotenv";
+import joi from "joi";
+import dayjs from "dayjs";
 
 dotenv.config();
 
+const participantSchema = joi.object({
+	name: joi.string().min(1).required(),
+});
+
 const mongoClient = new MongoClient(process.env.MONGO_URI);
 let db;
-mongoClient.connect().then(()=>{
-    db = mongoClient.db('UOLapi');
-})
+mongoClient.connect().then(() => {
+	db = mongoClient.db("UOLapi");
+});
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.post('/participants', async(req,res)=>{
-const {name} = req.body;
-const participants = await db.collection('participants').find().toArray();
-let repetido=false;
+async function repeatName(name) {
+	const participants = await db.collection("participants").find().toArray();
+	let repeat = false;
+	participants.forEach((element) => {
+		if (element.name === name) {
+			repeat = true;
+		}
+	});
+	return repeat;
+}
 
-participants.forEach(element => {  
-    if (element.name===name){
-        repetido=true;
-    }
+app.post("/participants", async (req, res) => {
+	const registry = req.body;
+	const validationParticipant = participantSchema.validate(registry, {
+		abortEarly: false,
+	});
+	if (validationParticipant.error) {
+		res.sendStatus(422);
+		return;
+	}
+	const isRepeat = await repeatName(registry.name).then((repeat) => {
+		if (repeat) {
+			return true;
+		}
+		return false;
+	});
+
+	if (isRepeat) {
+		res.sendStatus(409);
+		return;
+	}
+
+	try {
+		await db
+			.collection("participants")
+			.insertOne({ name: registry.name, lastStatus: Date.now() });
+
+		res.sendStatus(201);
+	} catch {
+		res.status(500);
+	}
 });
-if (repetido){
-    res.sendStatus(409);
-    return
-}
-try {
-   const participant = await db.collection('participants').insertOne({name}); 
-   res.status(201).send('O participante foi criado com o ID:' + participant.insertedId);
-}catch{
-    res.status(500);
-}
-})
 
-app.get('/', async(req,res)=>{
-const teste = await db.collection('participants').find().toArray();
-res.send(teste);
-})
+app.get("/", async (req, res) => {
+	const teste = await db.collection("participants").find().toArray();
+	res.send(teste);
+});
 
-app.listen(5000,()=>{console.log('Listening on port 5000')});
+export default app;
