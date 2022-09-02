@@ -58,15 +58,37 @@ app.post("/participants", async (req, res) => {
 			.collection("participants")
 			.insertOne({ name: registry.name, lastStatus: Date.now() });
 
+		await db
+			.collection("messages")
+			.insertOne({
+				from: registry.name,
+				to: "Todos",
+				text: "entra na sala...",
+				type: "status",
+				time: dayjs().locale('pt-br').format('HH:mm:ss')
+			});
 		res.sendStatus(201);
 	} catch {
 		res.status(500);
 	}
 });
 
-app.get("/", async (req, res) => {
-	const teste = await db.collection("participants").find().toArray();
-	res.send(teste);
+app.get("/participants", async (req, res) => {
+	try {
+		const participants = await db.collection("participants").find().toArray();
+		res.send(participants);
+	} catch {
+		res.sendStatus(500);
+	}
+});
+
+app.get("/messages", async (req, res) => {
+	try {
+		const messages = await db.collection("messages").find().toArray();
+		res.send(messages);
+	} catch {
+		res.sendStatus(500);
+	}
 });
 
 export default app;
