@@ -29,13 +29,7 @@ app.use(express.json());
 
 async function repeatName(name) {
 	const participants = await db.collection("participants").find().toArray();
-	let repeat = false;
-	participants.forEach((element) => {
-		if (element.name === name) {
-			repeat = true;
-		}
-	});
-	return repeat;
+	return participants.filter((element) => element.name === name);
 }
 
 app.post("/participants", async (req, res) => {
@@ -46,13 +40,10 @@ app.post("/participants", async (req, res) => {
 		return;
 	}
 	const isRepeat = await repeatName(registry.name).then((repeat) => {
-		if (repeat) {
-			return true;
-		}
-		return false;
+		return repeat.length;
 	});
 
-	if (isRepeat) {
+	if (isRepeat != 0) {
 		res.sendStatus(409);
 		return;
 	}
@@ -115,12 +106,19 @@ app.post("/messages", async (req, res) => {
 });
 
 app.get("/messages", async (req, res) => {
-	try {
-		const messages = await db.collection("messages").find().toArray();
-		res.send(messages);
-	} catch {
-		res.sendStatus(500);
+	const limit = req.query.limit;
+	const user = req.headers.user;
+	const messages = await db.collection("messages").find().toArray();
+	const userMessages = messages.filter(
+		(message) =>
+			message.to === user || message.to === "Todos" || message.from === user || message.type === "message"
+	);
+
+	if (!limit) {
+		res.send(userMessages);
+		return;
 	}
+	res.send(userMessages.splice(-limit, userMessages.length));
 });
 
 export default app;
