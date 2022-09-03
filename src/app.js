@@ -36,16 +36,14 @@ app.post("/participants", async (req, res) => {
 	const registry = req.body;
 	const validationParticipant = participantSchema.validate(registry);
 	if (validationParticipant.error) {
-		res.sendStatus(422);
-		return;
+		return res.sendStatus(422);
 	}
 	const isRepeat = await repeatName(registry.name).then((repeat) => {
 		return repeat.length;
 	});
 
 	if (isRepeat != 0) {
-		res.sendStatus(409);
-		return;
+		return res.sendStatus(409);
 	}
 
 	try {
@@ -79,16 +77,14 @@ app.post("/messages", async (req, res) => {
 	const message = req.body;
 	const validationMessage = messageSchema.validate(message);
 	if (validationMessage.error) {
-		res.sendStatus(422);
-		return;
+		return res.sendStatus(422);
 	}
 	const user = req.headers.user;
 	const userLogged = await db
 		.collection("participants")
 		.findOne({ name: user });
 	if (!userLogged) {
-		res.sendStatus(422);
-		return;
+		return res.sendStatus(422);
 	}
 
 	try {
@@ -111,14 +107,34 @@ app.get("/messages", async (req, res) => {
 	const messages = await db.collection("messages").find().toArray();
 	const userMessages = messages.filter(
 		(message) =>
-			message.to === user || message.to === "Todos" || message.from === user || message.type === "message"
+			message.to === user ||
+			message.to === "Todos" ||
+			message.from === user ||
+			message.type === "message"
 	);
 
 	if (!limit) {
-		res.send(userMessages);
-		return;
+		return res.send(userMessages);
 	}
 	res.send(userMessages.splice(-limit, userMessages.length));
+});
+
+app.post("/status", async (req, res) => {
+	const user = req.headers.user;
+	const userLogged = await db
+		.collection("participants")
+		.findOne({ name: user });
+	if (!userLogged) {
+		return res.sendStatus(404);
+	}
+	try {
+		await db
+			.collection("participants")
+			.updateOne({ _id: userLogged._id }, { $set: { lastStatus: Date.now() } });
+		res.sendStatus(200);
+	} catch {
+		res.sendStatus(500);
+	}
 });
 
 export default app;
