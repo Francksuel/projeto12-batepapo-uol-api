@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
@@ -137,26 +137,42 @@ app.post("/status", async (req, res) => {
 	}
 });
 
-setInterval(()=>participantsRemove(),15000);
+setInterval(() => participantsRemove(), 15000);
 
 async function participantsRemove() {
 	const participants = await db.collection("participants").find().toArray();
 	const participantsInactive = participants.filter(
-		(participant) => (Date.now() - participant.lastStatus) > 10000
-	);	
-	if (participantsInactive.length > 0){
-		participantsInactive.map(async(participant) => {
-			console.log(participant.name)			
-			await db.collection("participants").deleteOne({ _id:participant._id });
+		(participant) => Date.now() - participant.lastStatus > 10000
+	);
+	if (participantsInactive.length > 0) {
+		participantsInactive.map(async (participant) => {
+			await db.collection("participants").deleteOne({ _id: participant._id });
 			await db.collection("messages").insertOne({
 				from: participant.name,
 				to: "Todos",
 				text: "sai da sala...",
 				type: "status",
 				time: dayjs().locale("pt-br").format("HH:mm:ss"),
-			});	
-	});
+			});
+		});
+	}
 }
-}
+
+app.delete("/messages/:id_message", async (req, res) => {
+	const user = req.headers.user;
+	const { id_message } = req.params;
+	try {
+		const message = await db
+			.collection("messages")
+			.findOne({ _id: ObjectId(id_message) });
+		if (message.from !== user) {
+			return res.sendStatus(401);
+		}
+		await db.collection("messages").deleteOne({ _id: ObjectId(id_message) });
+		res.sendStatus(200);
+	} catch {
+		return res.sendStatus(404);
+	}
+});
 
 export default app;
