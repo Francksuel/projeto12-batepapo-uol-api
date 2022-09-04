@@ -137,4 +137,26 @@ app.post("/status", async (req, res) => {
 	}
 });
 
+setInterval(()=>participantsRemove(),15000);
+
+async function participantsRemove() {
+	const participants = await db.collection("participants").find().toArray();
+	const participantsInactive = participants.filter(
+		(participant) => (Date.now() - participant.lastStatus) > 10000
+	);	
+	if (participantsInactive.length > 0){
+		participantsInactive.map(async(participant) => {
+			console.log(participant.name)			
+			await db.collection("participants").deleteOne({ _id:participant._id });
+			await db.collection("messages").insertOne({
+				from: participant.name,
+				to: "Todos",
+				text: "sai da sala...",
+				type: "status",
+				time: dayjs().locale("pt-br").format("HH:mm:ss"),
+			});	
+	});
+}
+}
+
 export default app;
