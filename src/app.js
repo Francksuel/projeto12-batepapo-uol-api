@@ -175,4 +175,43 @@ app.delete("/messages/:id_message", async (req, res) => {
 	}
 });
 
+app.put("/messages/:id_message", async (req, res) => {
+	const messageEdited = req.body;
+	const { id_message } = req.params;
+	const validationMessage = messageSchema.validate(messageEdited);
+	if (validationMessage.error) {
+		return res.sendStatus(422);
+	}
+	const user = req.headers.user;
+	const userLogged = await db
+		.collection("participants")
+		.findOne({ name: user });
+	if (!userLogged) {
+		return res.sendStatus(422);
+	}
+	try {
+		const message = await db
+			.collection("messages")
+			.findOne({ _id: ObjectId(id_message)  });		
+		if (message.from != user) {
+			return res.sendStatus(401);
+		}		
+		await db.collection("messages").updateOne(
+			{ _id: ObjectId(id_message) },
+			{
+				$set: {
+					from: user,
+					to: messageEdited.to,
+					text: messageEdited.text,
+					type: messageEdited.type,
+					time: dayjs().locale("pt-br").format("HH:mm:ss"),
+				},
+			}
+		);
+		res.sendStatus(200);
+	} catch {
+		return res.sendStatus(404);
+	}
+});
+
 export default app;
