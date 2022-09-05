@@ -4,6 +4,7 @@ import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
+import {stripHtml} from "string-strip-html";
 
 dotenv.config();
 
@@ -33,10 +34,12 @@ async function repeatName(name) {
 }
 
 app.post("/participants", async (req, res) => {
-	const registry = req.body;
-	const validationParticipant = participantSchema.validate(registry);
+	const registry = req.body;	
+	const validationParticipant = participantSchema.validate(registry);	
 	if (validationParticipant.error) {
 		return res.sendStatus(422);
+	}else{
+		registry.name = stripHtml(registry.name).result.trim();
 	}
 	const isRepeat = await repeatName(registry.name).then((repeat) => {
 		return repeat.length;
@@ -78,6 +81,10 @@ app.post("/messages", async (req, res) => {
 	const validationMessage = messageSchema.validate(message);
 	if (validationMessage.error) {
 		return res.sendStatus(422);
+	}else{
+		message.to = stripHtml(message.to).result.trim();
+		message.text = stripHtml(message.text).result.trim();
+		message.type = stripHtml(message.type).result.trim();
 	}
 	const user = req.headers.user;
 	const userLogged = await db
@@ -192,10 +199,10 @@ app.put("/messages/:id_message", async (req, res) => {
 	try {
 		const message = await db
 			.collection("messages")
-			.findOne({ _id: ObjectId(id_message)  });		
+			.findOne({ _id: ObjectId(id_message) });
 		if (message.from != user) {
 			return res.sendStatus(401);
-		}		
+		}
 		await db.collection("messages").updateOne(
 			{ _id: ObjectId(id_message) },
 			{
